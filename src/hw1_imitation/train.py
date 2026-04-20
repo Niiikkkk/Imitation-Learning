@@ -22,6 +22,8 @@ from hw1_imitation.data import (
 from hw1_imitation.model import build_policy, PolicyType
 from hw1_imitation.evaluation import Logger
 
+from hw1_imitation.evaluation import evaluate_policy
+
 LOGDIR_PREFIX = "exp"
 
 
@@ -118,6 +120,8 @@ def run_training(config: TrainConfig) -> None:
         hidden_dims=config.hidden_dims,
     ).to(device)
 
+    model = torch.compile(model)
+
     exp_name = f"seed_{config.seed}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     if config.exp_name is not None:
         exp_name += f"_{config.exp_name}"
@@ -128,6 +132,43 @@ def run_training(config: TrainConfig) -> None:
     logger = Logger(log_dir)
 
     ### TODO: PUT YOUR MAIN TRAINING LOOP HERE ###
+    model.train()
+
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=config.lr, weight_decay=config.weight_decay
+    )
+
+    total_steps = 0
+
+    for epoch in range(config.num_epochs):
+        for batch_idx, (state_batch, action_chunk_batch) in enumerate(loader):
+            #1
+            optimizer.zero_grad(set_to_none=True)
+            #2 forward pass and loss
+            loss = model.compute_loss(state_batch.to(device), action_chunk_batch.to(device))
+            #3 backward
+            loss.backward()
+            #4 step
+            optimizer.step()
+
+            if (total_steps+1) % config.log_interval == 0:
+                logger.log({"train/loss": loss.item()}, step=total_steps)
+                print("Loss: {}".format(loss.item()))
+            if (total_steps+1) % config.eval_interval == 0:
+                evaluate_policy(
+                    model=model,
+                    normalizer=normalizer,
+                    device=device,
+                    chunk_size=config.chunk_size,
+                    video_size=config.video_size,
+                    num_video_episodes=config.num_video_episodes,
+                    flow_num_steps=config.flow_num_steps,
+                    step=total_steps,
+                    logger=logger,
+                )
+            total_steps += 1
+
+
 
     logger.dump_for_grading()
 

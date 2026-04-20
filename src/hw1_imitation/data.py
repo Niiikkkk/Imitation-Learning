@@ -11,6 +11,11 @@ import numpy as np
 import torch
 import zarr
 from torch.utils.data import Dataset
+import os
+import ssl
+import certifi
+
+os.environ['SSL_CERT_FILE'] = certifi.where()
 
 PUSHT_URL = "https://diffusion-policy.cs.columbia.edu/data/training/pusht.zip"
 ZARR_RELATIVE_PATH = Path("pusht") / "pusht_cchi_v7_replay.zarr"
